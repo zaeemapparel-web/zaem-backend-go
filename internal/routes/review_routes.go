@@ -8,7 +8,7 @@ import (
 
 func registerReviewRoutes(r *gin.RouterGroup, h *handlers.ReviewHandler) {
 	// Public (or optional auth)
-	r.GET("/products/:productId/reviews", h.GetProductReviews)
+	r.GET("/reviews/product/:productId", h.GetProductReviews)
 
 	// User (protected)
 	reviews := r.Group("/reviews")
