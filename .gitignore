@@ -1,0 +1,45 @@
+# Environment files (SECRETS - never commit!)
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+
+# Go binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+backend-go
+backend-go.exe
+
+# Test binary
+*.test
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Output directories
+/build/
+/dist/
+/bin/
+
+# IDE folders
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# Logs
+*.log
+logs/
