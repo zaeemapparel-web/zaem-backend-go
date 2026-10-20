@@ -122,7 +122,7 @@ type AdminRepository interface {
 	GetTodayRevenue(ctx context.Context) (float64, error)
 	GetTodayOrders(ctx context.Context) (int64, error)
 	GetLowStockCount(ctx context.Context, threshold int) (int64, error)
-	
+	GetAllOrders(ctx context.Context, limit, offset int, status string) ([]models.Order, int64, error)
 	GetRecentOrders(ctx context.Context, limit int) ([]models.Order, error)
 	GetTopProducts(ctx context.Context, limit int) ([]models.Product, error)
 	

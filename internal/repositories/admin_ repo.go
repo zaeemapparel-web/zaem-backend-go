@@ -141,3 +141,26 @@ func (r *adminRepository) UpdateUserFields(ctx context.Context, id string, field
 		Updates(fields).
 		Error
 }
+func (r *adminRepository) GetAllOrders(ctx context.Context, limit, offset int, status string) ([]models.Order, int64, error) {
+	query := database.DB.WithContext(ctx).Model(&models.Order{})
+
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var orders []models.Order
+	err := query.
+		Preload("User").
+		Preload("Items").
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&orders).Error
+
+	return orders, total, err
+}
