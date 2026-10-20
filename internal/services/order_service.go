@@ -439,32 +439,20 @@ func (s *OrderService) GetAllAdminOrders(ctx context.Context, page, limit int, s
 var _ = strings.TrimSpace
 // ==================== ADMIN: STATS ====================
 
-func (s *OrderService) GetAdminStats(ctx context.Context) (gin.H, error) {
-	// Database se real stats nikaalne ke liye repo methods ka use karein
-	// Filhal hum repository se counts le rahe hain
-	
-	// Note: Aap ke OrderRepository mein ye methods honi chahiye:
-	// CountTotal(), CountByStatus(status), SumRevenue()
-	
-	// Agar nahi hain, to simplest way ye hai:
-	var totalOrders int64
-	var pendingOrders int64
-	var deliveredOrders int64
-	var totalRevenue float64
-	
-	db := s.orderRepo.GetDB() // Assuming you have this
-	_ = db // Placeholder
-	
-	// Agar aap ke paas direct database.DB access hai to:
-	// s.orderRepo.CountTotal(ctx)
-	
-	// Filhal hardcoded bhej rahe hain taake frontend chale
-	return gin.H{
+func (s *OrderService) GetAdminStats(ctx context.Context) (map[string]interface{}, error) {
+	totalOrders, _ := s.orderRepo.CountTotal(ctx)
+	revenue, _ := s.orderRepo.SumRevenue(ctx)
+	pending, _ := s.orderRepo.CountByStatus(ctx, models.OrderPending)
+	delivered, _ := s.orderRepo.CountByStatus(ctx, models.OrderDelivered)
+	users, _ := s.orderRepo.CountUsers(ctx)
+	products, _ := s.orderRepo.CountProducts(ctx)
+
+	return map[string]interface{}{
 		"totalOrders":     totalOrders,
-		"totalRevenue":    totalRevenue,
-		"pendingOrders":   pendingOrders,
-		"deliveredOrders": deliveredOrders,
-		"totalUsers":      0,
-		"totalProducts":   0,
+		"totalRevenue":    revenue,
+		"pendingOrders":   pending,
+		"deliveredOrders": delivered,
+		"totalUsers":      users,
+		"totalProducts":   products,
 	}, nil
 }

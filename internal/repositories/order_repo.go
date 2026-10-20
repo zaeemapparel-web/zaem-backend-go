@@ -103,3 +103,37 @@ func (r *orderRepository) GetAllAdmin(ctx context.Context, limit, offset int, st
 
 	return orders, total, err
 }
+// ==================== ADMIN STATS ====================
+
+func (r *orderRepository) CountTotal(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Order{}).Count(&count).Error
+	return count, err
+}
+
+func (r *orderRepository) CountByStatus(ctx context.Context, status models.OrderStatus) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Order{}).Where("status = ?", status).Count(&count).Error
+	return count, err
+}
+
+func (r *orderRepository) SumRevenue(ctx context.Context) (float64, error) {
+	var sum float64
+	err := r.db.WithContext(ctx).Model(&models.Order{}).
+		Where("status NOT IN (?)", []models.OrderStatus{models.OrderCancelled, models.OrderReturned}).
+		Select("COALESCE(SUM(total), 0)").
+		Scan(&sum).Error
+	return sum, err
+}
+
+func (r *orderRepository) CountUsers(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.User{}).Where("role = ?", models.RoleUser).Count(&count).Error
+	return count, err
+}
+
+func (r *orderRepository) CountProducts(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Product{}).Where("is_active = ?", true).Count(&count).Error
+	return count, err
+}

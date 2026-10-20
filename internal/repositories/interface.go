@@ -95,6 +95,11 @@ type AddressRepository interface {
 // ==================== ORDER ====================
 
 type OrderRepository interface {
+	CountTotal(ctx context.Context) (int64, error)
+CountByStatus(ctx context.Context, status models.OrderStatus) (int64, error)
+SumRevenue(ctx context.Context) (float64, error)
+CountUsers(ctx context.Context) (int64, error)
+CountProducts(ctx context.Context) (int64, error)
 	CreateTx(ctx context.Context, order *models.Order) error
 	FindByID(ctx context.Context, id string) (*models.Order, error)
 	FindByOrderNumber(ctx context.Context, orderNumber string) (*models.Order, error)
