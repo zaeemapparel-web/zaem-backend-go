@@ -419,7 +419,7 @@ func (s *OrderService) GetAllAdminOrders(ctx context.Context, page, limit int, s
 	}
 	offset := (page - 1) * limit
 
-	pagination := dtos.Pagination{Page: page, Limit: limit}
+
 	
 	// Hum OrderRepo use karenge filter ke sath. 
 	// Abhi ke liye humara repo admin ka status filter support nahi karta, isliye repo function bana kar call karenge.
