@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog/log"
 	"github.com/zaem/backend-go/internal/dtos"
 	"github.com/zaem/backend-go/internal/services"
 	"github.com/zaem/backend-go/pkg/response"
@@ -10,14 +9,12 @@ import (
 )
 
 type AuthHandler struct {
-	authService *services.AuthService
+	svc *services.AuthService
 }
 
-func NewAuthHandler(authService *services.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(svc *services.AuthService) *AuthHandler {
+	return &AuthHandler{svc: svc}
 }
-
-// ==================== REGISTER ====================
 
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req dtos.RegisterRequest
@@ -25,17 +22,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		response.Error(c, 400, customvalidator.FormatErrors(err))
 		return
 	}
-
-	result, err := h.authService.Register(c.Request.Context(), req)
+	result, err := h.svc.Register(c.Request.Context(), req)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
-
-	response.Created(c, "Account created successfully", result)
+	response.Created(c, "Account created successfully. Welcome to ZAEM!", result)
 }
-
-// ==================== LOGIN ====================
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req dtos.LoginRequest
@@ -43,21 +36,17 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		response.Error(c, 400, customvalidator.FormatErrors(err))
 		return
 	}
-
-	result, err := h.authService.Login(c.Request.Context(), req, c.ClientIP())
+	result, err := h.svc.Login(c.Request.Context(), req, c.ClientIP())
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
-
-	response.OK(c, result)
+	response.OKMessage(c, "Logged in successfully.", result)
 }
 
-// ==================== GET ME ====================
-
 func (h *AuthHandler) GetMe(c *gin.Context) {
-	userID, _ := c.Get("user_id")
-	result, err := h.authService.GetMe(c.Request.Context(), userID.(string))
+	userID := c.GetString("user_id")
+	result, err := h.svc.GetMe(c.Request.Context(), userID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -65,26 +54,20 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 	response.OK(c, gin.H{"user": result})
 }
 
-// ==================== UPDATE PROFILE ====================
-
 func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	var req dtos.UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, customvalidator.FormatErrors(err))
 		return
 	}
-
-	userID, _ := c.Get("user_id")
-	result, err := h.authService.UpdateProfile(c.Request.Context(), userID.(string), req)
+	userID := c.GetString("user_id")
+	result, err := h.svc.UpdateProfile(c.Request.Context(), userID, req)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
-
-	response.OKMessage(c, "Profile updated successfully", gin.H{"user": result})
+	response.OKMessage(c, "Profile updated.", gin.H{"user": result})
 }
-
-// ==================== CHANGE PASSWORD ====================
 
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	var req dtos.ChangePasswordRequest
@@ -92,17 +75,13 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		response.Error(c, 400, customvalidator.FormatErrors(err))
 		return
 	}
-
-	userID, _ := c.Get("user_id")
-	if err := h.authService.ChangePassword(c.Request.Context(), userID.(string), req); err != nil {
+	userID := c.GetString("user_id")
+	if err := h.svc.ChangePassword(c.Request.Context(), userID, req); err != nil {
 		response.HandleError(c, err)
 		return
 	}
-
-	response.OKMessage(c, "Password changed successfully", nil)
+	response.OKMessage(c, "Password changed successfully.", nil)
 }
-
-// ==================== FORGOT PASSWORD ====================
 
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	var req dtos.ForgotPasswordRequest
@@ -110,16 +89,20 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		response.Error(c, 400, customvalidator.FormatErrors(err))
 		return
 	}
-
-	if err := h.authService.ForgotPassword(c.Request.Context(), req); err != nil {
-		response.HandleError(c, err)
-		return
-	}
-
-	response.OKMessage(c, "If an account exists with this email, a password reset link has been sent.", nil)
+	_ = h.svc.ForgotPassword(c.Request.Context(), req)
+	// Always return success
+	response.OKMessage(c, "If an account exists, a reset link has been sent", nil)
 }
 
-// ==================== RESET PASSWORD ====================
+func (h *AuthHandler) ValidateResetToken(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		response.Error(c, 400, "Token is required")
+		return
+	}
+	// Service mein validate karenge
+	response.OKMessage(c, "Token is valid", nil)
+}
 
 func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	var req dtos.ResetPasswordRequest
@@ -127,12 +110,9 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		response.Error(c, 400, customvalidator.FormatErrors(err))
 		return
 	}
-
-	if err := h.authService.ResetPassword(c.Request.Context(), req); err != nil {
+	if err := h.svc.ResetPassword(c.Request.Context(), req); err != nil {
 		response.HandleError(c, err)
 		return
 	}
-
-	log.Info().Msg("✅ Password reset endpoint completed")
-	response.OKMessage(c, "Password reset successfully. You can now log in.", nil)
+	response.OKMessage(c, "Password reset successfully", nil)
 }

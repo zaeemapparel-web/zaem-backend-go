@@ -22,79 +22,61 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		response.Error(c, 400, customvalidator.FormatErrors(err))
 		return
 	}
-
 	userID := c.GetString("user_id")
 	result, err := h.svc.Create(c.Request.Context(), userID, req)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
-
-	// Node.js format: data: { order }
-	response.Created(c, "Order placed successfully", gin.H{"order": result})
+	response.Created(c, "Order placed successfully.", gin.H{"order": result})
 }
 
 func (h *OrderHandler) GetMyOrders(c *gin.Context) {
 	userID := c.GetString("user_id")
-
 	pagination := dtos.NewPagination(c.Query("page"), c.Query("limit"), "created_at", "desc")
+	
+	// GetMyOrders returns []OrderResponse, int64, error
 	orders, total, err := h.svc.GetMyOrders(c.Request.Context(), userID, pagination)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
-
-	// Node.js format: count, data: { orders }
 	response.List(c, int(total), gin.H{"orders": orders})
 }
 
 func (h *OrderHandler) GetByID(c *gin.Context) {
 	orderID := c.Param("id")
 	userID := c.GetString("user_id")
-
 	result, err := h.svc.GetOrder(c.Request.Context(), userID, orderID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
-
 	response.OK(c, gin.H{"order": result})
 }
 
 func (h *OrderHandler) Cancel(c *gin.Context) {
 	orderID := c.Param("id")
-
-	var req dtos.CancelOrderRequest
-	_ = c.ShouldBindJSON(&req) // Node.js allows empty body for cancel
-
 	userID := c.GetString("user_id")
 	if err := h.svc.CancelOrder(c.Request.Context(), userID, orderID, "User requested"); err != nil {
 		response.HandleError(c, err)
 		return
 	}
-
 	response.OKMessage(c, "Order cancelled.", nil)
 }
 
-// ==================== ADMIN: GET ALL ====================
+// ==================== ADMIN ====================
 
 func (h *OrderHandler) AdminGetAllOrders(c *gin.Context) {
-	page := 1
-	limit := 20
-	status := c.Query("status")
-	// Basic parsing (you can improve this later)
-	if c.Query("page") != "" { page = 1 } 
-	// Note: Assuming pagination helper handles string to int if added later.
-	// For now, using default pagination.
-
 	pagination := dtos.NewPagination(c.Query("page"), c.Query("limit"), "created_at", "desc")
+	status := c.Query("status")
+	
 	orders, total, err := h.svc.GetAllAdminOrders(c.Request.Context(), pagination.Page, pagination.Limit, status)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
 
-	// Node.js format: count, pagination, data: { orders }
 	c.JSON(200, gin.H{
 		"success": true,
 		"count":   len(orders),
@@ -106,30 +88,21 @@ func (h *OrderHandler) AdminGetAllOrders(c *gin.Context) {
 		},
 		"data": gin.H{"orders": orders},
 	})
-	_ = page // ignoring local vars
-	_ = limit
 }
-
-// ==================== ADMIN: UPDATE STATUS ====================
 
 func (h *OrderHandler) AdminUpdateStatus(c *gin.Context) {
 	orderID := c.Param("id")
-
 	var req dtos.UpdateOrderStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, customvalidator.FormatErrors(err))
 		return
 	}
-
 	if err := h.svc.AdminUpdateStatus(c.Request.Context(), orderID, req); err != nil {
 		response.HandleError(c, err)
 		return
 	}
-
 	response.OKMessage(c, "Order updated.", nil)
 }
-
-// ==================== ADMIN: STATS ====================
 
 func (h *OrderHandler) AdminGetStats(c *gin.Context) {
 	stats, err := h.svc.GetAdminStats(c.Request.Context())
@@ -137,6 +110,5 @@ func (h *OrderHandler) AdminGetStats(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
-
 	response.OK(c, gin.H{"stats": stats})
 }

@@ -10,18 +10,16 @@ func registerOrderRoutes(r *gin.RouterGroup, h *handlers.OrderHandler) {
 	orders := r.Group("/orders")
 	orders.Use(middleware.Protect())
 
-	// 1. Admin routes (Must be before /:id)
+	// Admin routes (Must be before /:id)
 	admin := orders.Group("/admin")
 	admin.Use(middleware.AdminOnly())
 	{
 		admin.GET("/all", h.AdminGetAllOrders)
 		admin.GET("/stats", h.AdminGetStats)
 	}
-	
-	// Admin update status is under /orders/:id/status (not /admin)
 	orders.PUT("/:id/status", middleware.AdminOnly(), h.AdminUpdateStatus)
 
-	// 2. User routes
+	// User routes
 	orders.POST("/", h.Create)
 	orders.GET("/", h.GetMyOrders)
 	orders.GET("/:id", h.GetByID)

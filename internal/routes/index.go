@@ -69,4 +69,22 @@ func Register(r *gin.Engine) {
 	registerReviewRoutes(api, reviewHandler)
 	registerNotificationRoutes(api, notifHandler)
 	registerNewsletterRoutes(api, newsHandler)
+
+	// ==================== EMAIL TEST (Frontend/Backend Check) ====================
+	api.GET("/test-email", func(c *gin.Context) {
+		// Aap chahein to yahan email test ka function call kar sakte hain
+		c.JSON(200, gin.H{
+			"success": true,
+			"message": "Test email endpoint ready",
+		})
+	})
+
+	// ==================== 404 NOT FOUND ====================
+	r.NoRoute(func(c *gin.Context) {
+		c.JSON(404, gin.H{
+			"success": false,
+			"message": "Route not found",
+			"path":    c.Request.URL.Path,
+		})
+	})
 }

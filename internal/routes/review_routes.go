@@ -7,24 +7,27 @@ import (
 )
 
 func registerReviewRoutes(r *gin.RouterGroup, h *handlers.ReviewHandler) {
-	// Public (or optional auth)
+	// Public
 	r.GET("/reviews/product/:productId", h.GetProductReviews)
 
-	// User (protected)
+	// Protected (User)
 	reviews := r.Group("/reviews")
 	reviews.Use(middleware.Protect())
 	{
-		reviews.POST("", h.Create)
-		reviews.PUT("/:id", h.Update)
-		reviews.DELETE("/:id", h.Delete)
+		reviews.POST("/", h.Create)
+		reviews.GET("/my-reviews", h.GetMyReviews)
 		reviews.POST("/:id/helpful", h.MarkHelpful)
 	}
 
 	// Admin
-	admin := r.Group("/admin/reviews")
+	admin := r.Group("/reviews/admin")
 	admin.Use(middleware.Protect(), middleware.AdminOnly())
 	{
-		admin.GET("", h.GetAdminReviews)
-		admin.PATCH("/:id", h.AdminAction)
+		admin.GET("/all", h.GetAdminReviews)
+		admin.GET("/stats", h.GetReviewStats)
+		admin.PUT("/:id/approve", h.ApproveReview)
+		admin.PUT("/:id/reject", h.RejectReview)
+		admin.POST("/:id/reply", h.AdminReply)
+		admin.DELETE("/:id", h.Delete)
 	}
 }

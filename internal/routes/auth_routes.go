@@ -9,13 +9,14 @@ import (
 func registerAuthRoutes(r *gin.RouterGroup, h *handlers.AuthHandler) {
 	auth := r.Group("/auth")
 
-	// Public routes (with strict rate limit)
+	// Public
 	auth.POST("/register", middleware.RateLimitStrict(), h.Register)
 	auth.POST("/login", middleware.RateLimitAuth(), h.Login)
 	auth.POST("/forgot-password", middleware.RateLimitStrict(), h.ForgotPassword)
-	auth.POST("/reset-password", middleware.RateLimitStrict(), h.ResetPassword)
+	auth.GET("/validate-reset-token", h.ValidateResetToken)
+	auth.POST("/reset-password", h.ResetPassword)
 
-	// Protected routes (need JWT)
+	// Protected
 	protected := auth.Group("")
 	protected.Use(middleware.Protect())
 	{

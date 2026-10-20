@@ -53,13 +53,14 @@ func main() {
 	router.Use(middleware.CORS())
 	router.Use(middleware.RateLimitGeneral())
 
-	// 8. Health check routes
+	// 8. Health check routes (Frontend/Backend connection test)
 	router.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"brand":   "ZAEM",
-			"tagline": "Style. Redefined.",
-			"status":  "API is running (Go)",
-			"version": "1.0.0",
+			"brand":     "ZAEM",
+			"tagline":   "Style. Redefined.",
+			"status":    "API is running (Go)",
+			"version":   "1.0.0",
+			"timestamp": time.Now().UTC(),
 		})
 	})
 
@@ -69,16 +70,15 @@ func main() {
 			dbStatus = "error: " + err.Error()
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"status": "healthy",
-			"engine": "Go + Gin",
-			"services": gin.H{
-				"database": dbStatus,
-			},
+			"status":    "healthy",
+			"engine":    "Go + Gin",
+			"uptime":    time.Since(startTime).String(),
+			"services":  gin.H{"database": dbStatus},
 			"timestamp": time.Now().UTC(),
 		})
 	})
 
-	// 9. Register all API routes
+	// 9. Register all routes
 	routes.Register(router)
 
 	// 10. HTTP Server
@@ -90,28 +90,28 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Start server in goroutine
 	go func() {
-		log.Info().Msgf("📍 Server running on http://localhost:%s", config.C.Port)
+		log.Info().Msgf("📍 Server running on port %s", config.C.Port)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal().Err(err).Msg("❌ Server failed to start")
+			log.Fatal().Err(err).Msg("❌ Server failed")
 		}
 	}()
 
-	// 11. Wait for shutdown signal
+	// 11. Graceful Shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	log.Info().Msg("🛑 Shutting down server...")
 
-	// 12. Graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatal().Err(err).Msg("❌ Server forced to shutdown")
+		log.Fatal().Err(err).Msg("❌ Forced shutdown")
 	}
 
 	log.Info().Msg("✅ Server exited cleanly")
 }
+
+var startTime = time.Now()
