@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -18,19 +19,19 @@ import (
 const (
 	FreeShippingThreshold = 5000.0
 	ShippingCost          = 250.0
-	// Points: 1 point per Rs. 100
+	// 1 point per Rs. 100 spent
 	PointsPerRupee = 0.01
 )
 
 type OrderService struct {
-	orderRepo    repositories.OrderRepository
-	cartRepo     repositories.CartRepository
-	addressRepo  repositories.AddressRepository
-	productRepo  repositories.ProductRepository
-	couponRepo   repositories.CouponRepository
-	couponSvc    *CouponService
-	loyaltySvc   *LoyaltyService
-	emailSvc     *email.Service
+	orderRepo   repositories.OrderRepository
+	cartRepo    repositories.CartRepository
+	addressRepo repositories.AddressRepository
+	productRepo repositories.ProductRepository
+	couponRepo  repositories.CouponRepository
+	couponSvc   *CouponService
+	loyaltySvc  *LoyaltyService
+	emailSvc    *email.Service
 }
 
 func NewOrderService(
@@ -94,14 +95,14 @@ func (s *OrderService) Create(ctx context.Context, userID string, req dtos.Creat
 		shipping = 0
 	}
 
-	// 6. Redeem loyalty points (100 points = Rs. 100)
-loyaltyDiscount := 0.0
-if req.LoyaltyPoints > 0 {
-    loyaltyDiscount = float64(req.LoyaltyPoints) * 1.0 // 1 point = Rs. 1
-    if loyaltyDiscount > subtotal-discount {
-        loyaltyDiscount = subtotal - discount
-    }
-}
+	// 6. Redeem loyalty points (1 point = Rs. 1)
+	loyaltyDiscount := 0.0
+	if req.LoyaltyPoints > 0 {
+		loyaltyDiscount = float64(req.LoyaltyPoints) * 1.0
+		if loyaltyDiscount > (subtotal - discount) {
+			loyaltyDiscount = subtotal - discount
+		}
+	}
 
 	// 7. Final total
 	total := subtotal - discount - loyaltyDiscount + shipping
@@ -111,9 +112,9 @@ if req.LoyaltyPoints > 0 {
 
 	// 8. Generate order number
 	orderNumber := random.OrderNumber()
-
-	// 9. Create order in transaction
 	orderID := cuid.New()
+
+	// 9. Build order
 	order := &models.Order{
 		ID:            orderID,
 		OrderNumber:   orderNumber,
@@ -136,7 +137,6 @@ if req.LoyaltyPoints > 0 {
 		order.CouponCode = &coupon.Code
 	}
 
-	// Create items
 	for _, item := range cart.Items {
 		order.Items = append(order.Items, models.OrderItem{
 			ID:        cuid.New(),
@@ -150,13 +150,13 @@ if req.LoyaltyPoints > 0 {
 		})
 	}
 
+	// 10. Save to DB
 	if err := s.orderRepo.CreateTx(ctx, order); err != nil {
 		log.Error().Err(err).Msg("Failed to create order")
 		return nil, apperrors.Internal("Failed to create order")
 	}
 
-	// 10. Post-order actions
-	// 10a. Decrement stock
+	// 11. Post-order actions (Stock, Cart, Coupon, Loyalty)
 	for _, item := range cart.Items {
 		if item.Product.Stock >= item.Quantity {
 			newStock := item.Product.Stock - item.Quantity
@@ -167,13 +167,8 @@ if req.LoyaltyPoints > 0 {
 		}
 	}
 
-	// 10b. Clear cart
 	_ = s.cartRepo.ClearCart(ctx, cart.ID)
 
-	// 10c. Update user total spent
-	// (Will be updated on delivered — for now skip or do it here)
-
-	// 10d. Increment coupon usage
 	if coupon != nil {
 		_ = s.couponRepo.IncrementUsage(ctx, coupon.ID)
 		_ = s.couponRepo.CreateUsage(ctx, &models.CouponUsage{
@@ -184,21 +179,18 @@ if req.LoyaltyPoints > 0 {
 		})
 	}
 
-	// 10e. Redeem loyalty points
 	if req.LoyaltyPoints > 0 {
 		_ = s.loyaltySvc.RedeemPoints(ctx, userID, req.LoyaltyPoints, orderID)
 	}
 
-	// 10f. Send confirmation email (async)
+	// 12. Send email
 	orderWithRelations, _ := s.orderRepo.FindByID(ctx, orderID)
 	if orderWithRelations != nil {
 		go s.emailSvc.SendOrderConfirmation(orderWithRelations)
 	}
 
 	log.Info().Str("orderNumber", orderNumber).Float64("total", total).Msg("✅ Order created")
-
-	resp := s.toOrderResponse(orderWithRelations, address)
-	return resp, nil
+	return s.toOrderResponse(orderWithRelations, address), nil
 }
 
 // ==================== GET MY ORDERS ====================
@@ -240,8 +232,6 @@ func (s *OrderService) CancelOrder(ctx context.Context, userID, orderID, reason 
 	if order.UserID != userID {
 		return apperrors.Forbidden("You don't own this order")
 	}
-
-	// Only PENDING or CONFIRMED can be cancelled by user
 	if order.Status != models.OrderPending && order.Status != models.OrderConfirmed {
 		return apperrors.OrderNotCancellable()
 	}
@@ -267,7 +257,6 @@ func (s *OrderService) CancelOrder(ctx context.Context, userID, orderID, reason 
 		}
 	}
 
-	// Send cancellation email
 	order.Status = models.OrderCancelled
 	go s.emailSvc.SendOrderCancelled(order, reason)
 
@@ -287,21 +276,26 @@ func (s *OrderService) AdminUpdateStatus(ctx context.Context, orderID string, re
 	fields := map[string]interface{}{"status": newStatus}
 	now := time.Now().UTC()
 
+	// Payment Status Update
+	if req.PaymentStatus != "" {
+		fields["payment_status"] = models.PaymentStatus(req.PaymentStatus)
+	}
+
 	// Status-specific actions
 	switch newStatus {
 	case models.OrderShipped:
 		fields["shipped_at"] = now
-		if req.TrackingNumber != nil {
+		if req.TrackingNumber != nil && *req.TrackingNumber != "" {
 			fields["tracking_number"] = *req.TrackingNumber
 		}
-		if req.TrackingURL != nil {
+		if req.TrackingURL != nil && *req.TrackingURL != "" {
 			fields["tracking_url"] = *req.TrackingURL
 		}
 	case models.OrderDelivered:
 		fields["delivered_at"] = now
 		fields["payment_status"] = models.PaymentPaid
 
-		// Update user total spent + award points
+		// Award points only on delivery
 		go func() {
 			bgCtx := context.Background()
 			points := int(order.Total * PointsPerRupee)
@@ -318,7 +312,7 @@ func (s *OrderService) AdminUpdateStatus(ctx context.Context, orderID string, re
 		return apperrors.Internal("Failed to update order status")
 	}
 
-	// Reload with relations
+	// Reload with relations for email
 	order, _ = s.orderRepo.FindByID(ctx, orderID)
 
 	// Send email based on new status
@@ -399,5 +393,47 @@ func (s *OrderService) toOrderResponse(order *models.Order, address *models.Addr
 		}
 	}
 
+	// User Info (Frontend need this for Admin Panel)
+	if order.User.ID != "" {
+		resp.User = &dtos.UserResponse{
+			ID:    order.User.ID,
+			Name:  order.User.Name,
+			Email: order.User.Email,
+			Phone: order.User.Phone,
+			Role:  string(order.User.Role),
+		}
+	}
+
 	return resp
 }
+
+// ==================== ADMIN COMPATIBILITY (Real Stats) ====================
+
+// GetAllAdmin — Admin panel ke liye saare orders fetch karna (frontend format ke sath)
+func (s *OrderService) GetAllAdminOrders(ctx context.Context, page, limit int, status string) ([]dtos.OrderResponse, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 200 {
+		limit = 200
+	}
+	offset := (page - 1) * limit
+
+	pagination := dtos.Pagination{Page: page, Limit: limit}
+	
+	// Hum OrderRepo use karenge filter ke sath. 
+	// Abhi ke liye humara repo admin ka status filter support nahi karta, isliye repo function bana kar call karenge.
+	orders, total, err := s.orderRepo.GetAllAdmin(ctx, limit, offset, status)
+	if err != nil {
+		return nil, 0, apperrors.Internal("Failed to fetch orders")
+	}
+
+	result := make([]dtos.OrderResponse, 0, len(orders))
+	for i := range orders {
+		result = append(result, *s.toOrderResponse(&orders[i], orders[i].Address))
+	}
+	return result, total, nil
+}
+
+// Helper to check unused strings import
+var _ = strings.TrimSpace

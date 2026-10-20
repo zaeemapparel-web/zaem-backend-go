@@ -8,7 +8,7 @@ import (
 
 func registerOrderRoutes(r *gin.RouterGroup, h *handlers.OrderHandler) {
 	orders := r.Group("/orders")
-	orders.Use(middleware.Protect()) // All order routes need login
+	orders.Use(middleware.Protect())
 
 	// User routes
 	orders.POST("", h.Create)
@@ -17,9 +17,12 @@ func registerOrderRoutes(r *gin.RouterGroup, h *handlers.OrderHandler) {
 	orders.POST("/:id/cancel", h.Cancel)
 
 	// Admin routes
-	admin := orders.Group("")
+	admin := orders.Group("/admin")
 	admin.Use(middleware.AdminOnly())
 	{
-		admin.PATCH("/:id/status", h.AdminUpdateStatus)
+		// Frontend ke mutabiq routes
+		admin.GET("/stats", h.AdminGetStats)
+		admin.GET("/all", h.AdminGetAllOrders)
+		admin.PUT("/:id/status", h.AdminUpdateStatus)
 	}
 }

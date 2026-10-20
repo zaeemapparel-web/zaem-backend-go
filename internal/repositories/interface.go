@@ -100,7 +100,8 @@ type OrderRepository interface {
 	FindByOrderNumber(ctx context.Context, orderNumber string) (*models.Order, error)
 	FindByUserID(ctx context.Context, userID string, pagination dtos.Pagination) ([]models.Order, int64, error)
 	UpdateStatus(ctx context.Context, id string, fields map[string]interface{}) error
-}
+	GetAllAdmin(ctx context.Context, limit, offset int, status string) ([]models.Order, int64, error)
+}  
 
 // ==================== COUPON ====================
 
