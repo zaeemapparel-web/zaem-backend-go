@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/zaem/backend-go/internal/dtos"
+	apperrors "github.com/zaem/backend-go/internal/errors"
 	"github.com/zaem/backend-go/internal/services"
 	"github.com/zaem/backend-go/pkg/response"
 	customvalidator "github.com/zaem/backend-go/pkg/validator"
@@ -122,56 +125,15 @@ func (h *AdminHandler) ToggleUserActive(c *gin.Context) {
 	}
 	response.OKMessage(c, msg, nil)
 }
-func (s *AdminService) GetAllOrders(ctx context.Context, page, limit int, status string) ([]dtos.OrderResponse, int64, error) {
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 20
-	}
-	offset := (page - 1) * limit
+func (h *AdminHandler) GetAllOrders(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	status := c.Query("status")
 
-	orders, total, err := s.repo.GetAllOrders(ctx, limit, offset, status)
+	result, total, err := h.svc.GetAllOrders(c.Request.Context(), page, limit, status)
 	if err != nil {
-		return nil, 0, apperrors.Internal("Failed to fetch orders")
+		response.HandleError(c, err)
+		return
 	}
-
-	// OrderService ka toOrderResponse function use karne ke liye
-	// kyunki AdminService ke paas wo helper nahi hai, hum yahan manual mapping karenge
-	result := make([]dtos.OrderResponse, 0, len(orders))
-	for i := range orders {
-		order := &orders[i]
-		resp := dtos.OrderResponse{
-			ID:            order.ID,
-			OrderNumber:   order.OrderNumber,
-			UserID:        order.UserID,
-			Subtotal:      order.Subtotal,
-			ShippingCost:  order.ShippingCost,
-			Discount:      order.Discount,
-			Tax:           order.Tax,
-			Total:         order.Total,
-			Status:        string(order.Status),
-			PaymentMethod: string(order.PaymentMethod),
-			PaymentStatus: string(order.PaymentStatus),
-			Notes:         order.Notes,
-			CreatedAt:     order.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:     order.UpdatedAt.Format(time.RFC3339),
-		}
-
-		for _, item := range order.Items {
-			resp.Items = append(resp.Items, dtos.OrderItemResponse{
-				ID:        item.ID,
-				ProductID: item.ProductID,
-				Name:      item.Name,
-				Price:     item.Price,
-				Quantity:  item.Quantity,
-				Size:      item.Size,
-				Color:     item.Color,
-				Image:     item.Image,
-			})
-		}
-		
-		result = append(result, resp)
-	}
-	return result, total, nil
+	response.ListPaginated(c, gin.H{"orders": result}, page, limit, int(total))
 }
