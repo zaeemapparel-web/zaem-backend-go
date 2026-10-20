@@ -97,15 +97,23 @@ func (r *productRepository) FindAll(ctx context.Context, filter dtos.ProductFilt
 		return nil, 0, err
 	}
 
-	// Sort order
-	allowed := map[string]string{
-		"price":     "price",
-		"name":      "name",
-		"createdAt": "created_at",
-		"popular":   "sold_count",
-	}
-	orderClause := pagination.OrderClause(allowed, "created_at")
+	// Sort order (Frontend se aane wale custom sort ko handle karna)
+orderClause := "created_at DESC" // Default
 
+switch pagination.Sort {
+case "newest":
+	orderClause = "created_at DESC"
+case "oldest":
+	orderClause = "created_at ASC"
+case "price-low":
+	orderClause = "price ASC"
+case "price-high", "price-desc":
+	orderClause = "price DESC"
+case "popular":
+	orderClause = "sold_count DESC"
+case "name":
+	orderClause = "name ASC"
+}
 	// Fetch
 	var products []models.Product
 	err := query.
