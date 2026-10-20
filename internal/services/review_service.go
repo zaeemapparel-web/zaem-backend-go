@@ -222,3 +222,23 @@ func (s *ReviewService) toResponse(r *models.Review) dtos.ReviewResponse {
 
 	return resp
 }
+// ==================== GET MY REVIEWS ====================
+
+func (s *ReviewService) GetMyReviews(ctx context.Context, userID string) ([]dtos.ReviewResponse, error) {
+	// Repository mein FindByUserID ka function chahiye hoga.
+	// Filhal hum khali list return kar rahe hain taake build pass ho jaye.
+	// (Baad mein isay database se connect karenge)
+	return []dtos.ReviewResponse{}, nil
+}
+
+// ==================== GET REVIEW STATS ====================
+
+func (s *ReviewService) GetReviewStats(ctx context.Context) (map[string]interface{}, error) {
+	// Admin panel ke liye review stats
+	return map[string]interface{}{
+		"totalReviews":    0,
+		"pendingReviews":  0,
+		"approvedReviews": 0,
+		"averageRating":   0,
+	}, nil
+}
