@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	
-
 	"github.com/gin-gonic/gin"
 	"github.com/zaem/backend-go/internal/dtos"
 	"github.com/zaem/backend-go/internal/services"
@@ -32,26 +30,22 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Node.js format: data: { order }
 	response.Created(c, "Order placed successfully", gin.H{"order": result})
 }
 
 func (h *OrderHandler) GetMyOrders(c *gin.Context) {
 	userID := c.GetString("user_id")
 
-	pagination := dtos.NewPagination(
-		c.Query("page"),
-		c.Query("limit"),
-		"created_at",
-		"desc",
-	)
-
+	pagination := dtos.NewPagination(c.Query("page"), c.Query("limit"), "created_at", "desc")
 	orders, total, err := h.svc.GetMyOrders(c.Request.Context(), userID, pagination)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
 
-	response.ListPaginated(c, gin.H{"orders": orders}, pagination.Page, pagination.Limit, int(total))
+	// Node.js format: count, data: { orders }
+	response.List(c, int(total), gin.H{"orders": orders})
 }
 
 func (h *OrderHandler) GetByID(c *gin.Context) {
@@ -71,19 +65,52 @@ func (h *OrderHandler) Cancel(c *gin.Context) {
 	orderID := c.Param("id")
 
 	var req dtos.CancelOrderRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, customvalidator.FormatErrors(err))
-		return
-	}
+	_ = c.ShouldBindJSON(&req) // Node.js allows empty body for cancel
 
 	userID := c.GetString("user_id")
-	if err := h.svc.CancelOrder(c.Request.Context(), userID, orderID, req.Reason); err != nil {
+	if err := h.svc.CancelOrder(c.Request.Context(), userID, orderID, "User requested"); err != nil {
 		response.HandleError(c, err)
 		return
 	}
 
-	response.OKMessage(c, "Order cancelled successfully", nil)
+	response.OKMessage(c, "Order cancelled.", nil)
 }
+
+// ==================== ADMIN: GET ALL ====================
+
+func (h *OrderHandler) AdminGetAllOrders(c *gin.Context) {
+	page := 1
+	limit := 20
+	status := c.Query("status")
+	// Basic parsing (you can improve this later)
+	if c.Query("page") != "" { page = 1 } 
+	// Note: Assuming pagination helper handles string to int if added later.
+	// For now, using default pagination.
+
+	pagination := dtos.NewPagination(c.Query("page"), c.Query("limit"), "created_at", "desc")
+	orders, total, err := h.svc.GetAllAdminOrders(c.Request.Context(), pagination.Page, pagination.Limit, status)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	// Node.js format: count, pagination, data: { orders }
+	c.JSON(200, gin.H{
+		"success": true,
+		"count":   len(orders),
+		"pagination": gin.H{
+			"total":      total,
+			"page":       pagination.Page,
+			"limit":      pagination.Limit,
+			"totalPages": (int(total) + pagination.Limit - 1) / pagination.Limit,
+		},
+		"data": gin.H{"orders": orders},
+	})
+	_ = page // ignoring local vars
+	_ = limit
+}
+
+// ==================== ADMIN: UPDATE STATUS ====================
 
 func (h *OrderHandler) AdminUpdateStatus(c *gin.Context) {
 	orderID := c.Param("id")
@@ -99,33 +126,17 @@ func (h *OrderHandler) AdminUpdateStatus(c *gin.Context) {
 		return
 	}
 
-	response.OKMessage(c, "Order status updated successfully", nil)
+	response.OKMessage(c, "Order updated.", nil)
 }
 
-// ==================== FRONTEND COMPATIBILITY ROUTES ====================
+// ==================== ADMIN: STATS ====================
 
-// Frontend: GET /api/orders/admin/stats
 func (h *OrderHandler) AdminGetStats(c *gin.Context) {
-	// Filhal hardcoded stats bhej rahe hain taake frontend crash na ho
-	response.OK(c, gin.H{
-		"stats": gin.H{
-			"totalOrders":     0,
-			"totalRevenue":    0,
-			"pendingOrders":   0,
-			"deliveredOrders": 0,
-			"cancelledOrders": 0,
-			"returnedOrders":  0,
-			"totalUsers":      0,
-			"totalProducts":   0,
-		},
-	})
-}
+	stats, err := h.svc.GetAdminStats(c.Request.Context())
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
 
-// Frontend: GET /api/orders/admin/all
-func (h *OrderHandler) AdminGetAllOrders(c *gin.Context) {
-	// Filhal khali list bhej rahe hain taake SyntaxError na aaye
-	// Baad mein hum isay AdminService se connect karenge
-	response.OK(c, gin.H{
-		"orders": []dtos.OrderResponse{},
-	})
+	response.OK(c, gin.H{"stats": stats})
 }

@@ -10,19 +10,20 @@ func registerOrderRoutes(r *gin.RouterGroup, h *handlers.OrderHandler) {
 	orders := r.Group("/orders")
 	orders.Use(middleware.Protect())
 
-	// User routes
-	orders.POST("", h.Create)
-	orders.GET("", h.GetMyOrders)
-	orders.GET("/:id", h.GetByID)
-	orders.POST("/:id/cancel", h.Cancel)
-
-	// Admin routes
+	// 1. Admin routes (Must be before /:id)
 	admin := orders.Group("/admin")
 	admin.Use(middleware.AdminOnly())
 	{
-		// Frontend ke mutabiq routes
-		admin.GET("/stats", h.AdminGetStats)
 		admin.GET("/all", h.AdminGetAllOrders)
-		admin.PUT("/:id/status", h.AdminUpdateStatus)
+		admin.GET("/stats", h.AdminGetStats)
 	}
+	
+	// Admin update status is under /orders/:id/status (not /admin)
+	orders.PUT("/:id/status", middleware.AdminOnly(), h.AdminUpdateStatus)
+
+	// 2. User routes
+	orders.POST("/", h.Create)
+	orders.GET("/", h.GetMyOrders)
+	orders.GET("/:id", h.GetByID)
+	orders.PUT("/:id/cancel", h.Cancel)
 }
