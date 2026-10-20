@@ -11,10 +11,10 @@ type Product struct {
 	ComparePrice *float64 `json:"comparePrice,omitempty"`
 	CategoryID   string   `gorm:"type:text;index;not null" json:"categoryId"`
 
-	Images []string `gorm:"type:text[];serializer:json" json:"images"`
-	Sizes  []string `gorm:"type:text[];serializer:json" json:"sizes"`
-	Colors []string `gorm:"type:text[];serializer:json" json:"colors"`
-	Tags   []string `gorm:"type:text[];serializer:json" json:"tags"`
+	Images []string `gorm:"serializer:json" json:"images"`
+	Sizes  []string `gorm:"serializer:json" json:"sizes"`
+	Colors []string `gorm:"serializer:json" json:"colors"`
+	Tags   []string `gorm:"serializer:json" json:"tags"`
 
 	Stock      int     `gorm:"default:0;index" json:"stock"`
 	SKU        *string `gorm:"uniqueIndex" json:"sku,omitempty"`
